@@ -1,0 +1,5 @@
+{
+  "name": "Gmail Organizer",
+  "description": "An intelligent app that organizes raw email content by sender. Simply paste your emails, and the AI will group them, extracting key details like sender, subject, and a summary for easy reading.",
+  "requestFramePermissions": []
+}
