@@ -15,6 +15,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const signInButtonRef = useRef<HTMLDivElement>(null);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [gsiError, setGsiError] = useState<string | null>(null);
 
   const [rawEmails, setRawEmails] = useState<string>('');
   const [organizedData, setOrganizedData] = useState<OrganizedEmailGroup[] | null>(null);
@@ -46,6 +47,7 @@ const App: React.FC = () => {
 
   const handleSignOut = () => {
       setUser(null);
+      setGsiError(null); // Clear any GSI errors on sign out
       if (signInButtonRef.current) {
           signInButtonRef.current.style.display = 'block';
       }
@@ -60,15 +62,37 @@ const App: React.FC = () => {
         return;
     }
 
-    if (window.google && signInButtonRef.current) {
-      window.google.accounts.id.initialize({
-        client_id: process.env.GOOGLE_CLIENT_ID!,
-        callback: handleCredentialResponse
-      });
-      window.google.accounts.id.renderButton(
-        signInButtonRef.current,
-        { theme: "outline", size: "large", type: "standard", text: "signin_with" }
-      );
+    const initializeGsi = () => {
+      try {
+        if (window.google && signInButtonRef.current) {
+          window.google.accounts.id.initialize({
+            client_id: process.env.GOOGLE_CLIENT_ID!,
+            callback: handleCredentialResponse
+          });
+          window.google.accounts.id.renderButton(
+            signInButtonRef.current,
+            { theme: "outline", size: "large", type: "standard", text: "signin_with" }
+          );
+          setGsiError(null); // Clear previous errors on success
+        }
+      } catch (err) {
+        console.error("Google Sign-In initialization error:", err);
+        setGsiError("Google Sign-In failed to initialize. Please check that your Client ID is correct and the website origin is authorized in your Google Cloud Console.");
+      }
+    };
+    
+    // The GSI script is loaded asynchronously, so we poll for its availability.
+    if (window.google) {
+      initializeGsi();
+    } else {
+      const intervalId = setInterval(() => {
+        if (window.google) {
+          clearInterval(intervalId);
+          initializeGsi();
+        }
+      }, 100);
+      // Clean up interval on component unmount
+      return () => clearInterval(intervalId);
     }
   }, []);
 
@@ -92,20 +116,68 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDeleteEmail = (senderEmail: string, emailIndex: number) => {
+    setOrganizedData(currentData => {
+      if (!currentData) return null;
+
+      const newData = currentData
+        .map(group => {
+          if (group.senderEmail === senderEmail) {
+            // Filter out the email at the specified index
+            const updatedEmails = group.emails.filter((_, index) => index !== emailIndex);
+            // Return a new group object with the updated emails
+            return { ...group, emails: updatedEmails };
+          }
+          return group;
+        })
+        .filter(group => group.emails.length > 0); // Filter out groups that are now empty
+
+      return newData;
+    });
+  };
+
   const sortedData = useMemo(() => {
     if (!organizedData) return null;
+
     const groupsWithSortedEmails = organizedData.map(group => ({
       ...group,
       emails: [...group.emails].sort((a, b) => {
         const timeA = new Date(a.date).getTime();
         const timeB = new Date(b.date).getTime();
-        return sortOrder === 'newest' ? (isNaN(timeB) ? -1 : timeB) - (isNaN(timeA) ? -1 : timeA) : (isNaN(timeA) ? -1 : timeA) - (isNaN(timeB) ? -1 : timeB);
+        
+        const validA = !isNaN(timeA);
+        const validB = !isNaN(timeB);
+
+        if (validA && validB) {
+            return sortOrder === 'newest' ? timeB - timeA : timeA - timeB;
+        }
+        // Place invalid dates at the end
+        if (validA) return -1; // a is valid, b is not, a comes first
+        if (validB) return 1;  // b is valid, a is not, b comes first
+        return 0; // both invalid
       }),
     }));
+    
     return [...groupsWithSortedEmails].sort((a, b) => {
-      const firstEmailTimeA = a.emails.length > 0 ? new Date(a.emails[0].date).getTime() : 0;
-      const firstEmailTimeB = b.emails.length > 0 ? new Date(b.emails[0].date).getTime() : 0;
-      return sortOrder === 'newest' ? (isNaN(firstEmailTimeB) ? -1 : firstEmailTimeB) - (isNaN(firstEmailTimeA) ? -1 : firstEmailTimeA) : (isNaN(firstEmailTimeA) ? -1 : firstEmailTimeA) - (isNaN(firstEmailTimeB) ? -1 : firstEmailTimeB);
+      const firstEmailA = a.emails[0];
+      const firstEmailB = b.emails[0];
+
+      if (!firstEmailA && !firstEmailB) return 0;
+      if (!firstEmailA) return 1; // groups with no emails go to the end
+      if (!firstEmailB) return -1;
+
+      const timeA = new Date(firstEmailA.date).getTime();
+      const timeB = new Date(firstEmailB.date).getTime();
+
+      const validA = !isNaN(timeA);
+      const validB = !isNaN(timeB);
+
+      if (validA && validB) {
+          return sortOrder === 'newest' ? timeB - timeA : timeA - timeB;
+      }
+      if (validA) return -1;
+      if (validB) return 1;
+      return 0;
     });
   }, [organizedData, sortOrder]);
 
@@ -138,6 +210,12 @@ const App: React.FC = () => {
                 Sign in with your Google account to securely organize your emails using the power of AI.
               </p>
               <div ref={signInButtonRef} className="flex justify-center"></div>
+              {gsiError && (
+                <div className="mt-4 text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+                    <p className="font-semibold">Sign-In Error</p>
+                    <p className="text-sm">{gsiError}</p>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -209,6 +287,7 @@ const App: React.FC = () => {
                   data={sortedData}
                   sortOrder={sortOrder}
                   setSortOrder={setSortOrder}
+                  onDeleteEmail={handleDeleteEmail}
                 />
               </div>
             </main>

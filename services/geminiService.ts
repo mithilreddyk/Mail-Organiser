@@ -8,7 +8,7 @@ const getAiClient = (): GoogleGenAI => {
         return ai;
     }
     if (!process.env.API_KEY) {
-        throw new Error("Configuration error: The API_KEY environment variable is not set.");
+        throw new Error("AI Service Error: The API_KEY environment variable is missing. Please ensure it's configured to enable AI features.");
     }
     ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     return ai;
@@ -40,7 +40,7 @@ const schema = {
               },
               date: {
                 type: Type.STRING,
-                description: "The date the email was sent.",
+                description: "The date the email was sent, in ISO 8601 format (e.g., '2024-07-30T10:00:00Z').",
               },
               summary: {
                 type: Type.STRING,
@@ -61,6 +61,7 @@ export const organizeEmails = async (emailContent: string): Promise<OrganizedEma
         You are an expert email organization assistant.
         Analyze the following block of text which contains one or more emails.
         Extract the sender's name, sender's email address, subject, date, and a concise summary of the email body for each email.
+        The date for each email must be in the ISO 8601 format (e.g., '2024-07-30T10:00:00Z').
         Group the results by the sender's email address.
         Provide the output in the structured JSON format defined by the provided schema.
         If you cannot find a piece of information, represent it as an empty string.
@@ -95,7 +96,7 @@ export const organizeEmails = async (emailContent: string): Promise<OrganizedEma
         console.error("Error calling Gemini API:", error);
         if (error instanceof Error) {
             // Preserve our specific configuration error message
-            if (error.message.startsWith("Configuration error:")) {
+            if (error.message.startsWith("AI Service Error:")) {
                 throw error;
             }
         }

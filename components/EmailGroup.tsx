@@ -1,10 +1,11 @@
 
 import React, { useState, useCallback } from 'react';
 import type { OrganizedEmailGroup, Email } from '../types';
-import { ChevronDownIcon, ClipboardIcon, CheckIcon, CalendarIcon, MailIcon } from './Icons';
+import { ChevronDownIcon, ClipboardIcon, CheckIcon, CalendarIcon, TrashIcon } from './Icons';
 
 interface EmailGroupProps {
   group: OrganizedEmailGroup;
+  onDeleteEmail: (senderEmail: string, emailIndex: number) => void;
 }
 
 const CopyButton: React.FC<{ textToCopy: string }> = ({ textToCopy }) => {
@@ -32,12 +33,19 @@ const CopyButton: React.FC<{ textToCopy: string }> = ({ textToCopy }) => {
     );
 };
 
-const EmailCard: React.FC<{ email: Email }> = ({ email }) => (
+const EmailCard: React.FC<{ email: Email, onDelete: () => void }> = ({ email, onDelete }) => (
     <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg relative group">
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1">
             <CopyButton textToCopy={`Subject: ${email.subject}\n\n${email.summary}`} />
+            <button
+                onClick={onDelete}
+                className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-600 dark:hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-gray-800 transition-colors"
+                aria-label="Delete email"
+            >
+                <TrashIcon className="w-5 h-5" />
+            </button>
         </div>
-        <h4 className="font-semibold text-gray-800 dark:text-gray-200 pr-10">{email.subject}</h4>
+        <h4 className="font-semibold text-gray-800 dark:text-gray-200 pr-20">{email.subject}</h4>
         <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mt-1 mb-2">
             <CalendarIcon className="w-3.5 h-3.5" />
             <span>{email.date || 'No date found'}</span>
@@ -46,7 +54,7 @@ const EmailCard: React.FC<{ email: Email }> = ({ email }) => (
     </div>
 );
 
-const EmailGroup: React.FC<EmailGroupProps> = ({ group }) => {
+const EmailGroup: React.FC<EmailGroupProps> = ({ group, onDeleteEmail }) => {
   const [isOpen, setIsOpen] = useState(true);
   
   const emailCount = group.emails.length;
@@ -76,7 +84,7 @@ const EmailGroup: React.FC<EmailGroupProps> = ({ group }) => {
       {isOpen && (
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
             {group.emails.map((email, index) => (
-                <EmailCard key={index} email={email} />
+                <EmailCard key={index} email={email} onDelete={() => onDeleteEmail(group.senderEmail, index)} />
             ))}
         </div>
       )}

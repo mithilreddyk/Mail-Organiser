@@ -9,6 +9,7 @@ interface ResultsDisplayProps {
   data: OrganizedEmailGroup[] | null;
   sortOrder: SortOrder;
   setSortOrder: (order: SortOrder) => void;
+  onDeleteEmail: (senderEmail: string, emailIndex: number) => void;
 }
 
 const LoadingSkeleton: React.FC = () => (
@@ -48,7 +49,7 @@ const SortControls: React.FC<{ sortOrder: SortOrder; setSortOrder: (order: SortO
 );
 
 
-const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ isLoading, error, data, sortOrder, setSortOrder }) => {
+const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ isLoading, error, data, sortOrder, setSortOrder, onDeleteEmail }) => {
   if (isLoading) {
     return <LoadingSkeleton />;
   }
@@ -93,7 +94,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ isLoading, error, data,
         )}
       </div>
       {data.map((group, index) => (
-        <EmailGroup key={`${group.senderEmail}-${index}`} group={group} />
+        <EmailGroup key={`${group.senderEmail}-${index}`} group={group} onDeleteEmail={onDeleteEmail} />
       ))}
     </div>
   );
